@@ -34,7 +34,10 @@ def module_2_preprocessing(external_validation_set, model_type):
     scaler = sklearn.preprocessing.StandardScaler()
     scaler.fit(df_imp)
     df_final = pd.DataFrame(scaler.transform(df_imp), columns=df.columns)
-    df_final = df_final[FEATURES_FOR_MODEL]
+    if model_type == "a":
+        df_final = df_final[FEATURES_FOR_MODEL_A]
+    else:
+        df_final = df_final[FEATURES_FOR_MODEL_B]
     return df_final
 
 @debuggable
@@ -43,7 +46,8 @@ def get_all_features(microbio_path, drugs_path, lab_path, model_type):
     microbio_df = get_microbio_df(microbio_path, model_type)
     drugs_df = get_drugs_df(drugs_path)
     df = lab_df.merge(microbio_df, how='left', left_index=True, right_on='identifier')
-    return df.merge(drugs_df, how='left', on="identifier")
+    df = df.merge(drugs_df, how='left', on="identifier")
+    return df.dropna(how='all', axis=1)
 
 @debuggable
 def get_lab_full_features_df(data_path, model_type):

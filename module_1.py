@@ -33,8 +33,7 @@ def module_1_cohort_creation(file_path, db_conn, model_type):
       hadm_id VARCHAR(50),
       admittime TIMESTAMP,
       icu_time TIMESTAMP,
-      target_time TIMESTAMP,
-      target VARCHAR(50)
+      target_time TIMESTAMP
     );
     COPY mimic_cohort
     FROM %s
@@ -42,40 +41,50 @@ def module_1_cohort_creation(file_path, db_conn, model_type):
     CSV HEADER;
     """
     cur.execute(query, (file_path,))
-    fetch_microbio(db_conn, model_type).to_csv(microbio_output_path, index=False)
-    fetch_drugs(db_conn).to_csv(drugs_output_path, index=False)
-    fetch_lab_weight_ethnicity(db_conn).to_csv(lab_weight_ethnicity_output_path, index=False)
+    fetch_microbio(cur, model_type).to_csv(microbio_output_path, index=False)
+    fetch_drugs(cur).to_csv(drugs_output_path, index=False)
+    fetch_lab_weight_ethnicity(cur).to_csv(lab_weight_ethnicity_output_path, index=False)
     cur.close()
     return (microbio_output_path, drugs_output_path, lab_weight_ethnicity_output_path)
 
 @debuggable
 # Get microbiologyevents data, the days back changes between model a and model b
-def fetch_microbio(db_conn, model_type):
+def fetch_microbio(cur, model_type):
     if model_type == 'a':
-        time_back = 3 * 24 * 60 * 60
-        cols = "spec_type_desc"
+        query = """
+        DROP TABLE IF EXISTS microbio;
+        CREATE TABLE microbio as(
+            SELECT DISTINCT
+                    identifier, spec_type_desc
+            FROM
+                (select *, subject_id||'-'||hadm_id as identifier from mimiciii.microbiologyevents) as t0
+                INNER JOIN (select identifier, target_time from mimic_cohort) _tmp2 using (identifier)
+            WHERE
+                 identifier in (select identifier from mimic_cohort)
+            AND
+                (extract(epoch from target_time - chartdate)) > 3 * 24 * 60 * 60
+        );
+        """
     else:
-        time_back = 2 * 24 * 60 * 60
-        cols = "spec_type_desc, org_name"
-    query = """
-    DROP TABLE IF EXISTS microbio;
-    CREATE TABLE microbio as(
-        SELECT DISTINCT
-                identifier, {cols}
-        FROM
-            (select *, subject_id||'-'||hadm_id as identifier from mimiciii.microbiologyevents) as t0
-            INNER JOIN (select identifier, target_time from mimic_cohort) _tmp2 using (identifier)
-        WHERE
-             identifier in (select identifier from mimic_cohort)
-        AND
-            (extract(epoch from target_time - chartdate)) > %s
-    );
-    """
-    return get_table_df(db_conn, query, 'microbio', (cols, time_back))
+        query = """
+        DROP TABLE IF EXISTS microbio;
+        CREATE TABLE microbio as(
+            SELECT DISTINCT
+                    identifier, spec_type_desc, org_name
+            FROM
+                (select *, subject_id||'-'||hadm_id as identifier from mimiciii.microbiologyevents) as t0
+                INNER JOIN (select identifier, target_time from mimic_cohort) _tmp2 using (identifier)
+            WHERE
+                 identifier in (select identifier from mimic_cohort)
+            AND
+                (extract(epoch from target_time - chartdate)) > 2 * 24 * 60 * 60
+        );
+        """
+    return get_table_df(cur, query, 'microbio')
 
 @debuggable
 # Get prescriptions data
-def fetch_drugs(db_conn):
+def fetch_drugs(cur):
     query = """
     DROP TABLE IF EXISTS drugs;
     CREATE TABLE drugs as(
@@ -90,25 +99,22 @@ def fetch_drugs(db_conn):
             (extract(epoch from target_time - t0.startdate)) > 0
     );
     """
-    return get_table_df(db_conn, query, 'drugs')
+    return get_table_df(cur, query, 'drugs')
 
 @debuggable
-def get_table_df(db_conn, query, table_name, microbio_cols_time_back_tuple=(None, None)):
-    cur = db_conn.cursor()
-    if table_name == 'microbio':
-        cur.execute(sql.SQL(query).format(cols=sql.Identifier(microbio_cols_time_back_tuple[0])),
-                    (microbio_cols_time_back_tuple[1],))
-    else:
-        cur.execute(query)
+def get_table_df(cur, query, table_name):
+    cur.execute(query)
     cur.execute(sql.SQL("SELECT * FROM {};").format(sql.Identifier(table_name)))
     # Retrieve query results
     records = cur.fetchall()
     colnames = [desc[0] for desc in cur.description]
     return pd.DataFrame(data=records, columns=colnames)
 
-def fetch_lab_weight_ethnicity(db_conn):
-    return get_table_df(db_conn, get_lab_weight_ethnicity_query(), 'relevant_events')
+@debuggable
+def fetch_lab_weight_ethnicity(cur):
+    return get_table_df(cur, get_lab_weight_ethnicity_query(), 'relevant_events')
 
+@debuggable
 def get_lab_weight_ethnicity_query():
     return """/* (4_a) Create Table Format*/ 							  
     DROP TABLE IF EXISTS _relevantFeatures;
@@ -224,7 +230,7 @@ def get_lab_weight_ethnicity_query():
             round(CAST((extract(epoch from target_time - admittime) / 3600.0) as numeric),2) as hours_from_admittime_to_targettime
     FROM 
         all_relevant_lab_features			
-        INNER JOIN (select identifier, target, target_time, admittime from mimic_cohort) _tmp2 using (identifier)
+        INNER JOIN (select identifier, target_time, admittime from mimic_cohort) _tmp2 using (identifier)
         INNER JOIN (select subject_id,gender, dob from mimiciii.patients where subject_id in (
                                         select CAST (subject_id as INTEGER) 
                                         from mimic_cohort)) as t3 	
