@@ -5,22 +5,26 @@ from os import path
 
 DEBUG = False
 
+
 def debuggable(func):
     if DEBUG:
         def decorated(*args, **kwargs):
-            print("Entering ",func.__name__)
-            ret = func(*args,  **kwargs)
+            print("Entering ", func.__name__)
+            ret = func(*args, **kwargs)
             print(func.__name__, "finished ")
             return ret
+
         return decorated
     else:
         return func
 
+
 @debuggable
 def module_1_cohort_creation(file_path, db_conn, model_type):
-    microbio_output_path = path.abspath("./external_validation_set_microbio.csv")
-    drugs_output_path = path.abspath("./external_validation_set_drugs.csv")
-    lab_weight_ethnicity_output_path = path.abspath("./external_validation_set_lab_weight_ethnicity.csv")
+    microbio_output_path = path.abspath("./model_" + model_type + "_external_validation_set_microbio.csv")
+    drugs_output_path = path.abspath("./model_" + model_type + "_external_validation_set_drugs.csv")
+    lab_weight_ethnicity_output_path = path.abspath(
+        "./model_" + model_type + "_external_validation_set_lab_weight_ethnicity.csv")
     cur = db_conn.cursor()
     # Data loading
     query = """
@@ -46,6 +50,7 @@ def module_1_cohort_creation(file_path, db_conn, model_type):
     fetch_lab_weight_ethnicity(cur).to_csv(lab_weight_ethnicity_output_path, index=False)
     cur.close()
     return (microbio_output_path, drugs_output_path, lab_weight_ethnicity_output_path)
+
 
 @debuggable
 # Get microbiologyevents data, the days back changes between model a and model b
@@ -82,6 +87,7 @@ def fetch_microbio(cur, model_type):
         """
     return get_table_df(cur, query, 'microbio')
 
+
 @debuggable
 # Get prescriptions data
 def fetch_drugs(cur):
@@ -101,6 +107,7 @@ def fetch_drugs(cur):
     """
     return get_table_df(cur, query, 'drugs')
 
+
 @debuggable
 def get_table_df(cur, query, table_name):
     cur.execute(query)
@@ -110,9 +117,11 @@ def get_table_df(cur, query, table_name):
     colnames = [desc[0] for desc in cur.description]
     return pd.DataFrame(data=records, columns=colnames)
 
+
 @debuggable
 def fetch_lab_weight_ethnicity(cur):
     return get_table_df(cur, get_lab_weight_ethnicity_query(), 'relevant_events')
+
 
 @debuggable
 def get_lab_weight_ethnicity_query():
@@ -243,4 +252,3 @@ def get_lab_weight_ethnicity_query():
         (extract(epoch from target_time - all_relevant_lab_features.charttime)) > 0
     );
     """
-
