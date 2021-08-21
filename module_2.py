@@ -22,7 +22,7 @@ def debuggable(func):
 
 @debuggable
 def module_2_preprocessing(external_validation_set, model_type):
-    output_path = path.abspath("./processed_external_validation_set.csv")
+    output_path = path.abspath("./model_" + model_type + "_processed_external_validation_set.csv")
     # Represents the time range for using lab results
     # (we will use the results from the days_back before target time)
     days_back = 3 if (model_type == 'a') else 4
@@ -30,12 +30,12 @@ def module_2_preprocessing(external_validation_set, model_type):
     df = get_all_features(external_validation_set[0], external_validation_set[1], external_validation_set[2],
                           model_type, days_back)
     # Imputate data
-    imputer = pickle.load(open("./task_a/imputer_fit_a", "rb")) if (model_type == 'a') else pickle.load(
-        open("./task_b/imputer_fit_b", "rb"))
+    imputer = pickle.load(open("./trained/task_a/imputer_fit_a", "rb")) if (model_type == 'a') else pickle.load(
+        open("./trained/task_b/imputer_fit_b", "rb"))
     df_imp = imputer.transform(df)
     # Scale data
-    scaler = pickle.load(open("./task_a/scaler_a", "rb")) if (model_type == 'a') else pickle.load(
-        open("./task_b/scaler_b", "rb"))
+    scaler = pickle.load(open("./trained/task_a/scaler_a", "rb")) if (model_type == 'a') else pickle.load(
+        open("./trained/task_b/scaler_b", "rb"))
     scaler.fit(df_imp)
     df_final = pd.DataFrame(scaler.transform(df_imp), columns=df.columns, index=df.index)
     if model_type == "a":
