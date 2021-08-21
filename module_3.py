@@ -21,5 +21,3 @@ def get_X_and_id(data_frame, idx_name):
     identifier = data_frame.loc[:,[idx_name]]
     X = data_frame.drop(columns = [idx_name])
     return X, identifier
-
-module_3_model("model_a_processed_external_validation_set.csv", "a")
