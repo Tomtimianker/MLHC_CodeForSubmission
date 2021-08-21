@@ -2,7 +2,6 @@ import pandas as pd
 import warnings
 import pickle
 warnings.filterwarnings(action='ignore', category=UserWarning)
-from adacost.adacost import AdaCost
 
 def module_3_model(test_set, model_type):
     test_set = pd.read_csv(fr'{test_set}')
@@ -21,3 +20,4 @@ def get_X_and_id(data_frame, idx_name):
     identifier = data_frame.loc[:,[idx_name]]
     X = data_frame.drop(columns = [idx_name])
     return X, identifier
+
