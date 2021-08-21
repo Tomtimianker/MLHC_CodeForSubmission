@@ -44,7 +44,7 @@ def module_1_cohort_creation(file_path, db_conn, model_type):
     DELIMITER ','
     CSV HEADER;
     """
-    cur.execute(query, (file_path,))
+    cur.execute(query, (path.abspath(file_path),))
     fetch_microbio(cur, model_type).to_csv(microbio_output_path, index=False)
     fetch_drugs(cur).to_csv(drugs_output_path, index=False)
     fetch_lab_weight_ethnicity(cur).to_csv(lab_weight_ethnicity_output_path, index=False)

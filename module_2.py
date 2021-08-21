@@ -4,6 +4,7 @@ import sklearn.preprocessing
 from sklearn.impute import KNNImputer
 import pickle
 from os import path
+import numpy as np
 
 DEBUG = False
 
@@ -39,9 +40,9 @@ def module_2_preprocessing(external_validation_set, model_type):
     scaler.fit(df_imp)
     df_final = pd.DataFrame(scaler.transform(df_imp), columns=df.columns, index=df.index)
     if model_type == "a":
-        df_final[SELECTED_FEATURES_MODEL_A].to_csv(output_path)
+        df_final[SELECTED_FEATURES_MODEL_A].to_csv(output_path, index_label="identifier")
     else:
-        df_final[SELECTED_FEATURES_MODEL_B].to_csv(output_path)
+        df_final[SELECTED_FEATURES_MODEL_B].to_csv(output_path, index_label="identifier")
     return output_path
 
 
@@ -53,8 +54,11 @@ def get_all_features(microbio_path, drugs_path, lab_path, model_type, days_back)
     df = lab_df.merge(microbio_df, how='left', left_index=True, right_on='identifier')
     df = df.merge(drugs_df, how='left', on="identifier")
     df = df.dropna(how='all', axis=1).set_index('identifier')
-    return df[ALL_FEATURES_MODEL_A] if (model_type == 'a') else df[ALL_FEATURES_MODEL_B]
-
+    index_all_features = pd.Index(ALL_FEATURES_MODEL_A) if (model_type == 'a') else pd.Index(ALL_FEATURES_MODEL_B)
+    # Add zero columns for features that are used in the imputation model but are not in the test
+    features_not_in_df = pd.Index(index_all_features).difference(df.columns)
+    df = pd.concat([df, pd.DataFrame(0, index=np.arange(len(df)), columns=features_not_in_df)], axis=1)
+    return df[index_all_features]
 
 @debuggable
 def get_lab_full_features_df(data_path, model_type, days_back):
